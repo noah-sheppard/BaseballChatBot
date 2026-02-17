@@ -1,8 +1,6 @@
 import { GoogleGenAI, Chat } from "@google/genai";
 import { GameState, Message } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 const SYSTEM_INSTRUCTION = `
 You are DiamondTutor, an expert, friendly, and enthusiastic baseball tutor.
 Your goal is to help new fans understand the game of baseball in real-time.
@@ -19,11 +17,25 @@ Context Awareness:
 - If the count is 3-0, explain why the batter might "take" a pitch.
 `;
 
+let ai: GoogleGenAI | null = null;
 let chatSession: Chat | null = null;
+
+// Lazy initialization of the AI client
+const getAiClient = (): GoogleGenAI => {
+  if (!ai) {
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) {
+      throw new Error("API_KEY is not defined");
+    }
+    ai = new GoogleGenAI({ apiKey });
+  }
+  return ai;
+};
 
 export const getChatSession = async (): Promise<Chat> => {
   if (!chatSession) {
-    chatSession = ai.chats.create({
+    const client = getAiClient();
+    chatSession = client.chats.create({
       model: 'gemini-3-flash-preview',
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
@@ -72,7 +84,6 @@ export const sendMessage = async (
     return result.text || "I'm having trouble reading the play right now. Ask me again in a moment!";
   } catch (error) {
     console.error("Gemini API Error:", error);
-    // Return the error message to the chat so the user knows something went wrong
     return "Sorry, I lost my connection to the dugout. Please try asking again.";
   }
 };
