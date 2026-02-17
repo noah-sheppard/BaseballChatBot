@@ -1,27 +1,7 @@
-import { GoogleGenAI, ChatSession } from "@google/genai";
+import { GoogleGenAI, Chat } from "@google/genai";
 import { GameState, Message } from "../types";
 
-// Helper to get key safely across environments (Vite vs Node/Simulated)
-const getApiKey = (): string => {
-  // For Vite (Local Development)
-  // We use type coercion to avoid TypeScript errors if types aren't fully set up
-  if (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_API_KEY) {
-    return (import.meta as any).env.VITE_API_KEY;
-  }
-  
-  // For Simulated Environment / Node
-  try {
-    if (typeof process !== 'undefined' && process.env?.API_KEY) {
-      return process.env.API_KEY;
-    }
-  } catch(e) {
-    // Ignore process not defined errors in strict browser environments
-  }
-  
-  return '';
-};
-
-const ai = new GoogleGenAI({ apiKey: getApiKey() });
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const SYSTEM_INSTRUCTION = `
 You are DiamondTutor, an expert, friendly, and enthusiastic baseball tutor.
@@ -39,11 +19,11 @@ Context Awareness:
 - If the count is 3-0, explain why the batter might "take" a pitch.
 `;
 
-let chatSession: ChatSession | null = null;
+let chatSession: Chat | null = null;
 
-export const getChatSession = async (): Promise<ChatSession> => {
+export const getChatSession = async (): Promise<Chat> => {
   if (!chatSession) {
-    chatSession = await ai.chats.create({
+    chatSession = ai.chats.create({
       model: 'gemini-3-flash-preview',
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
@@ -76,9 +56,8 @@ export const sendMessage = async (
   text: string, 
   gameState: GameState
 ): Promise<string> => {
-  const key = getApiKey();
-  if (!key) {
-    return "Configuration Error: No API Key found. If running locally, please add VITE_API_KEY to your .env file.";
+  if (!process.env.API_KEY) {
+    return "Configuration Error: No API Key found. Please ensure process.env.API_KEY is set.";
   }
 
   try {
