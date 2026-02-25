@@ -82,9 +82,17 @@ export const sendMessage = async (
     });
 
     return result.text || "I'm having trouble reading the play right now. Ask me again in a moment!";
-  } catch (error) {
+  } catch (error: any) {
     console.error("Gemini API Error:", error);
-    return "Sorry, I lost my connection to the dugout. Please try asking again.";
+    let errorMessage = "Sorry, I lost my connection to the dugout. Please try asking again.";
+    
+    if (error.message?.includes("API_KEY")) {
+      errorMessage = "Configuration Error: API Key is invalid or missing.";
+    } else if (error.message?.includes("429")) {
+      errorMessage = "I'm getting too many questions at once! Please wait a moment.";
+    }
+    
+    return errorMessage;
   }
 };
 
@@ -118,36 +126,51 @@ export const analyzeUserKnowledge = async (
   `;
 
   try {
-    const response = await client.models.generateContent({
-      model: 'gemini-3.1-pro-preview',
-      contents: prompt,
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            rulesKnowledge: { type: Type.NUMBER },
-            strategicInsight: { type: Type.NUMBER },
-            historicalContext: { type: Type.NUMBER },
-            situationalAwareness: { type: Type.NUMBER },
-            misconceptions: { 
-              type: Type.ARRAY,
-              items: { type: Type.STRING }
-            },
-            learningPath: {
-              type: Type.ARRAY,
-              items: { type: Type.STRING }
-            },
-            lastAnalyzed: { type: Type.STRING }
+    let response;
+    try {
+      response = await client.models.generateContent({
+        model: 'gemini-3.1-pro-preview',
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              rulesKnowledge: { type: Type.NUMBER },
+              strategicInsight: { type: Type.NUMBER },
+              historicalContext: { type: Type.NUMBER },
+              situationalAwareness: { type: Type.NUMBER },
+              misconceptions: { 
+                type: Type.ARRAY,
+                items: { type: Type.STRING }
+              },
+              learningPath: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING }
+              },
+              lastAnalyzed: { type: Type.STRING }
+            }
           }
         }
-      }
-    });
+      });
+    } catch (proError) {
+      console.warn("Pro model failed, falling back to Flash", proError);
+      response = await client.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: prompt + "\n\nReturn ONLY valid JSON.",
+        config: {
+          responseMimeType: 'application/json'
+        }
+      });
+    }
     
     const text = response.text;
     if (!text) return currentProfile;
     
-    const newProfile = JSON.parse(text) as UserKnowledgeProfile;
+    // Strip markdown code blocks if present
+    const jsonStr = text.replace(/```json\n?|\n?```/g, '').trim();
+    
+    const newProfile = JSON.parse(jsonStr) as UserKnowledgeProfile;
     // Ensure we keep the timestamp fresh
     newProfile.lastAnalyzed = new Date().toISOString();
     

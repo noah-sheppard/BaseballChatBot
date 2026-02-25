@@ -7,7 +7,7 @@ export default defineConfig(({ mode }) => {
   // Load standard env files
   const env = loadEnv(mode, process.cwd(), '');
 
-  // Manually try to load 'key.env' if it exists, as the user has this specific file
+  // Manually try to load 'key.env' if it exists
   try {
     const keyEnvPath = path.resolve(process.cwd(), 'key.env');
     if (fs.existsSync(keyEnvPath)) {
@@ -16,7 +16,7 @@ export default defineConfig(({ mode }) => {
         const match = line.match(/^([^=]+)=(.*)$/);
         if (match) {
           const key = match[1].trim();
-          const value = match[2].trim().replace(/^["']|["']$/g, ''); // Remove quotes if present
+          const value = match[2].trim().replace(/^["']|["']$/g, '');
           if (key === 'VITE_API_KEY') {
              env.VITE_API_KEY = value;
           }
@@ -27,11 +27,14 @@ export default defineConfig(({ mode }) => {
     console.warn("Could not load key.env", e);
   }
 
+  // Prioritize VITE_API_KEY, then API_KEY (from system/env), then process.env.API_KEY
+  const apiKey = env.VITE_API_KEY || env.API_KEY || process.env.API_KEY || '';
+
   return {
     plugins: [react()],
     define: {
       // Polyfill process.env.API_KEY so the @google/genai SDK works
-      'process.env.API_KEY': JSON.stringify(env.VITE_API_KEY),
+      'process.env.API_KEY': JSON.stringify(apiKey),
     },
   };
 });

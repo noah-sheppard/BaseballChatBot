@@ -34,12 +34,14 @@ const App: React.FC = () => {
   });
 
   const [isDashboardOpen, setIsDashboardOpen] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const messageCountRef = useRef(1); // Start at 1 (welcome message)
 
   const handleMessagesUpdate = async (messages: Message[]) => {
     // Analyze every 2 new messages (User + AI pair)
-    if (messages.length >= messageCountRef.current + 2) {
+    if (!isAnalyzing && messages.length >= messageCountRef.current + 2) {
       messageCountRef.current = messages.length;
+      setIsAnalyzing(true);
       
       // Run analysis in background
       try {
@@ -48,6 +50,8 @@ const App: React.FC = () => {
         setUserProfile(newProfile);
       } catch (e) {
         console.error("Failed to update user profile", e);
+      } finally {
+        setIsAnalyzing(false);
       }
     }
   };
@@ -68,13 +72,22 @@ const App: React.FC = () => {
           </div>
         </div>
         
-        <button
-          onClick={() => setIsDashboardOpen(true)}
-          className="flex items-center gap-2 px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition-colors shadow-lg shadow-indigo-900/20"
-        >
-          <Brain className="w-4 h-4" />
-          <span className="hidden sm:inline">System Intelligence</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {!process.env.API_KEY && (
+            <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-red-500/10 border border-red-500/20 rounded-full">
+              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+              <span className="text-xs text-red-400 font-medium">No API Key</span>
+            </div>
+          )}
+          
+          <button
+            onClick={() => setIsDashboardOpen(true)}
+            className="flex items-center gap-2 px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition-colors shadow-lg shadow-indigo-900/20"
+          >
+            <Brain className="w-4 h-4" />
+            <span className="hidden sm:inline">System Intelligence</span>
+          </button>
+        </div>
       </header>
 
       {/* Main Layout - Responsive Grid */}
