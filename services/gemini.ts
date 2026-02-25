@@ -1,5 +1,5 @@
-import { GoogleGenAI, Chat } from "@google/genai";
-import { GameState, Message } from "../types";
+import { GoogleGenAI, Chat, Type } from "@google/genai";
+import { GameState, Message, UserKnowledgeProfile } from "../types";
 
 const SYSTEM_INSTRUCTION = `
 You are DiamondTutor, an expert, friendly, and enthusiastic baseball tutor.
@@ -85,5 +85,75 @@ export const sendMessage = async (
   } catch (error) {
     console.error("Gemini API Error:", error);
     return "Sorry, I lost my connection to the dugout. Please try asking again.";
+  }
+};
+
+export const analyzeUserKnowledge = async (
+  history: { role: string; text: string }[],
+  currentProfile: UserKnowledgeProfile
+): Promise<UserKnowledgeProfile> => {
+  if (!process.env.API_KEY) {
+    console.warn("No API Key for analysis");
+    return currentProfile;
+  }
+
+  const client = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  
+  const prompt = `
+    You are an expert educational psychologist and baseball coach.
+    Your task is to analyze the user's baseball knowledge based on their chat history.
+    
+    Current Profile:
+    ${JSON.stringify(currentProfile)}
+    
+    Recent Chat History:
+    ${history.map(m => `${m.role}: ${m.text}`).join('\n')}
+    
+    Analyze the user's questions and responses.
+    - Update their knowledge scores (0-100) for Rules, Strategy, History, and Situational Awareness.
+    - Identify any specific misconceptions they might have shown (e.g., "Why didn't he run on a foul tip?").
+    - Suggest the next 3 topics they should learn based on their current gaps.
+    
+    Return a JSON object matching the UserKnowledgeProfile structure.
+  `;
+
+  try {
+    const response = await client.models.generateContent({
+      model: 'gemini-3.1-pro-preview',
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            rulesKnowledge: { type: Type.NUMBER },
+            strategicInsight: { type: Type.NUMBER },
+            historicalContext: { type: Type.NUMBER },
+            situationalAwareness: { type: Type.NUMBER },
+            misconceptions: { 
+              type: Type.ARRAY,
+              items: { type: Type.STRING }
+            },
+            learningPath: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING }
+            },
+            lastAnalyzed: { type: Type.STRING }
+          }
+        }
+      }
+    });
+    
+    const text = response.text;
+    if (!text) return currentProfile;
+    
+    const newProfile = JSON.parse(text) as UserKnowledgeProfile;
+    // Ensure we keep the timestamp fresh
+    newProfile.lastAnalyzed = new Date().toISOString();
+    
+    return newProfile;
+  } catch (error) {
+    console.error("Analysis Error:", error);
+    return currentProfile;
   }
 };

@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
-import { GameState, Message } from './types';
+import React, { useState, useRef } from 'react';
+import { GameState, Message, UserKnowledgeProfile, LearningArchitecture } from './types';
 import { Scoreboard } from './components/Scoreboard';
 import { Field } from './components/Field';
 import { Chat } from './components/Chat';
 import { QuickTips } from './components/QuickTips';
+import { LearningDashboard } from './components/LearningDashboard';
+import { analyzeUserKnowledge } from './services/gemini';
+import { Brain } from 'lucide-react';
 
 const App: React.FC = () => {
   // Centralized state for the game context (User manually updates this to give AI context)
@@ -20,6 +23,35 @@ const App: React.FC = () => {
     awayScore: 0,
   });
 
+  const [userProfile, setUserProfile] = useState<UserKnowledgeProfile>({
+    rulesKnowledge: 10,
+    strategicInsight: 5,
+    historicalContext: 0,
+    situationalAwareness: 5,
+    misconceptions: [],
+    learningPath: [],
+    lastAnalyzed: new Date().toISOString()
+  });
+
+  const [isDashboardOpen, setIsDashboardOpen] = useState(false);
+  const messageCountRef = useRef(1); // Start at 1 (welcome message)
+
+  const handleMessagesUpdate = async (messages: Message[]) => {
+    // Analyze every 2 new messages (User + AI pair)
+    if (messages.length >= messageCountRef.current + 2) {
+      messageCountRef.current = messages.length;
+      
+      // Run analysis in background
+      try {
+        const history = messages.map(m => ({ role: m.role, text: m.text }));
+        const newProfile = await analyzeUserKnowledge(history, userProfile);
+        setUserProfile(newProfile);
+      } catch (e) {
+        console.error("Failed to update user profile", e);
+      }
+    }
+  };
+
   return (
     <div className="flex flex-col h-screen max-h-screen bg-slate-900 text-slate-100 overflow-hidden">
       {/* Header */}
@@ -35,6 +67,14 @@ const App: React.FC = () => {
             <p className="text-xs text-slate-400">Your AI Baseball Companion</p>
           </div>
         </div>
+        
+        <button
+          onClick={() => setIsDashboardOpen(true)}
+          className="flex items-center gap-2 px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition-colors shadow-lg shadow-indigo-900/20"
+        >
+          <Brain className="w-4 h-4" />
+          <span className="hidden sm:inline">System Intelligence</span>
+        </button>
       </header>
 
       {/* Main Layout - Responsive Grid */}
@@ -66,10 +106,23 @@ const App: React.FC = () => {
         {/* Right Panel: Chat Interface */}
         <section className="flex-1 flex flex-col h-full relative bg-slate-900">
            {/* Mobile Field View Toggle could go here, but keeping it simple */}
-           <Chat gameState={gameState} />
+           <Chat gameState={gameState} onMessagesUpdate={handleMessagesUpdate} />
         </section>
 
       </main>
+
+      {/* Learning Dashboard Modal */}
+      {isDashboardOpen && (
+        <LearningDashboard 
+          userProfile={userProfile}
+          architecture={{
+            tokens: ["Game State", "User Query"],
+            words: ["Rules", "Strategy", "History"],
+            embeddings: ["User Knowledge Vector"]
+          }}
+          onClose={() => setIsDashboardOpen(false)}
+        />
+      )}
     </div>
   );
 };

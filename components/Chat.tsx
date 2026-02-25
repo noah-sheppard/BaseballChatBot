@@ -4,16 +4,17 @@ import { sendMessage } from '../services/gemini';
 
 interface ChatProps {
   gameState: GameState;
+  onMessagesUpdate?: (messages: Message[]) => void;
 }
 
-export const Chat: React.FC<ChatProps> = ({ gameState }) => {
+export const Chat: React.FC<ChatProps> = ({ gameState, onMessagesUpdate }) => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'welcome',
       role: 'model',
-      text: "Hi! I'm DiamondTutor. I'm here to help you understand the game. Set the game situation on the left (or top on mobile) and ask me anything! Try asking: \"Why did the batter bunt here?\"",
+      text: "Hi! I'm DiamondTutor. I'm here to help you understand the game. Set the game situation on the left (or top on mobile) and ask me anything! \n\nCheck out the 'System Intelligence' button in the header to see how I'm modeling your baseball knowledge in real-time.",
       timestamp: new Date()
     }
   ]);
@@ -25,7 +26,10 @@ export const Chat: React.FC<ChatProps> = ({ gameState }) => {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+    if (onMessagesUpdate) {
+      onMessagesUpdate(messages);
+    }
+  }, [messages, onMessagesUpdate]);
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
