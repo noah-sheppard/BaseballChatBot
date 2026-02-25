@@ -27,8 +27,8 @@ export default defineConfig(({ mode }) => {
     console.warn("Could not load key.env", e);
   }
 
-  // Prioritize VITE_API_KEY, then API_KEY (from system/env), then process.env.API_KEY
-  const apiKey = env.VITE_API_KEY || env.API_KEY || process.env.API_KEY || '';
+  // Prioritize VITE_API_KEY, then GEMINI_API_KEY, then API_KEY (from system/env), then process.env.API_KEY
+  const apiKey = env.VITE_API_KEY || env.GEMINI_API_KEY || env.API_KEY || process.env.API_KEY || '';
 
   return {
     plugins: [react()],
